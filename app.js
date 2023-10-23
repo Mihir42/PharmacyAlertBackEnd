@@ -36,12 +36,33 @@ const buildDrugsselectSql = (id, variant) => {
     return sql;
 }
 
+const buildPatientPrescription = (id, variant) => {
+    let sql = '';
+    let table1 = 'drugs';
+    let table2 = 'prescriptions';
+    let table3 = 'prescribeddrugs';
+    let table4 = 'patients';
+    let fields = ['drugs.DrugID', 'drugs.DrugName', 'drugs.DrugDosage', 'drugs.DrugSymptoms', 'prescriptions.PrescriptionsID', 'prescriptions.PrescriptionsDrugID', 'prescribeddrugs.PrescribeddrugsID', 'patients.PatientID'];
+
+    switch(variant) {
+        default:
+            sql = `SELECT ${fields} FROM ${table1}
+            INNER JOIN ${table2}
+            ON drugs.DrugID = prescriptions.PrescriptionsDrugID
+            INNER JOIN ${table3}
+            ON prescriptions.PrescriptionPrescribedDrugID = prescribeddrugs.PrescribeddrugsID
+            INNER JOIN ${table4}
+            ON prescribeddrugs.PrescribeddrugsPatientID = patients.PatientID AND patients.PatientID = ${id};`;
+    }
+    return sql;
+}
+
 const getDrugController = async (req, res, variant) => {
     const id = req.params.id;
     
     // Validate request
     // Access data 
-    const sql = buildDrugsselectSql(id, variant);
+    const sql = buildPatientPrescription(id, variant);
     const { isSuccess, result, message } = await read(sql);
     if (!isSuccess) return res.status(404).json({message});
 

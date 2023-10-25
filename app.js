@@ -42,7 +42,7 @@ const buildPatientPrescription = (id, variant) => {
     let table2 = 'prescriptions';
     let table3 = 'prescribeddrugs';
     let table4 = 'patients';
-    let fields = ['drugs.DrugID', 'drugs.DrugName', 'drugs.DrugDosage', 'drugs.DrugSymptoms', 'prescriptions.PrescriptionsID', 'prescriptions.PrescriptionsDrugID', 'prescribeddrugs.PrescribeddrugsID', 'patients.PatientID'];
+    let fields = ['drugs.DrugName', 'drugs.DrugDosage', 'drugs.DrugSymptoms', 'patients.PatientID', 'patients.PatientFirstName', 'patients.PatientLastName'];
 
     switch(variant) {
         default:
@@ -54,7 +54,7 @@ const buildPatientPrescription = (id, variant) => {
             INNER JOIN ${table4}
             ON prescribeddrugs.PrescribeddrugsPatientID = patients.PatientID AND patients.PatientID = ${id};`;
     }
-    return sql;
+    return sql; 
 }
 
 const getDrugController = async (req, res, variant) => {

@@ -22,44 +22,10 @@ app.use(function (req, res, next) {
 app.use(cors({ origin: "*" }));
 // Controllers -----------------------------------
 
-const read = async (selectsql) => {
-  try {
-    const [result] = await database.query(selectsql);
-    return result.length === 0
-      ? { isSuccess: false, result: null, message: "No record(s) found" }
-      : {
-          isSuccess: true,
-          result: result,
-          message: "Records(s) successfully recovered",
-        };
-  } catch (error) {
-    return {
-      isSuccess: false,
-      result: null,
-      message: `Failed to execute query: ${error.message}`,
-    };
-  }
-};
-
-const buildDrugsselectSql = (id, variant) => {
+const buildPrescriptionsSelectSql = (id, variant) => {
   let sql = "";
-  let table = "drugs";
-  let fields = ["DrugID", "DrugName", "DrugDosage", "DrugSymptoms"];
-
-  switch (variant) {
-    default:
-      sql = `SELECT ${fields} from ${table}`;
-      if (id) sql += ` WHERE DrugID=${id}`;
-  }
-  return sql;
-};
-
-const buildPatientPrescription = (id, variant) => {
-  let sql = "";
-  let table1 = "drugs";
-  let table2 = "prescriptions";
-  let table3 = "prescribeddrugs";
-  let table4 = "patients";
+  let table =
+    "(((drugs INNER JOIN prescriptions ON drugs.DrugID = prescriptions.PrescriptionsDrugID) INNER JOIN prescribeddrugs on prescriptions.PrescriptionPrescribedDrugID = prescribeddrugs.PrescribeddrugsID ) INNER JOIN patients ON prescribeddrugs.PrescribeddrugsPatientID = patients.PatientID) ";
   let fields = [
     "drugs.DrugID",
     "drugs.DrugName",
@@ -71,35 +37,96 @@ const buildPatientPrescription = (id, variant) => {
   ];
 
   switch (variant) {
+    case "drug":
+      sql = `SELECT ${fields} FROM ${table} WHERE DrugID=${id}`;
+      break;
     default:
-      sql = `SELECT ${fields} FROM ${table1}
-            INNER JOIN ${table2}
-            ON drugs.DrugID = prescriptions.PrescriptionsDrugID
-            INNER JOIN ${table3}
-            ON prescriptions.PrescriptionPrescribedDrugID = prescribeddrugs.PrescribeddrugsID
-            INNER JOIN ${table4}
-            ON prescribeddrugs.PrescribeddrugsPatientID = patients.PatientID AND patients.PatientID = ${id};`;
+      sql = `SELECT ${fields} FROM ${table}`;
+      if (id) sql += `WHERE PatientID=${id}`;
   }
+
   return sql;
 };
 
-const getDrugController = async (req, res, variant) => {
+const buildDrugsSelectSQL = (id, variant) => {
+  let sql = "";
+  let table = "drugs";
+  let fields = [
+    "drugs.DrugID",
+    "drugs.DrugName",
+    "drugs.DrugDosage",
+    "drugs.DrugSymptoms",
+  ];
+
+  switch (variant) {
+    default:
+      sql = `SELECT ${fields} FROM ${table}`;
+      if (id) sql += ` WHERE DrugID=${id}`;
+  }
+  console.log(id);
+  return sql;
+};
+
+const getPrescriptionsController = async (req, res, variant) => {
   const id = req.params.id;
+  // Build SQL
+  const sql = buildPrescriptionsSelectSql(id, variant);
+  // Execute Query
+  let isSuccess = false;
+  let message = "";
+  let result = null;
+  try {
+    [result] = await database.query(sql);
+    if (result.length === 0) message = "No record(s) found";
+    else {
+      isSuccess = true;
+      message = "Record(s) successfully recovered";
+    }
+  } catch (error) {
+    message = `Failed to execute query: ${error.message}`;
+  }
+  //Responses
+  isSuccess ? res.status(200).json(result) : res.status(400).json({ message });
+};
 
-  // Validate request
-  // Access data
-  const sql = buildPatientPrescription(id, variant);
-  const { isSuccess, result, message } = await read(sql);
-  if (!isSuccess) return res.status(404).json({ message });
-
-  // Response to request
-  res.status(200).json(result);
+const getDrugsController = async (req, res, variant) => {
+  const id = req.params.id;
+  //Build SQL
+  const sql = buildDrugsSelectSQL(id, variant);
+  // Execute Query
+  let isSuccess = false;
+  let message = "";
+  let result = null;
+  try {
+    [result] = await database.query(sql);
+    if (result.length === 0) message = "No record(s) found";
+    else {
+      isSuccess = true;
+      message = "Record(s) successfully recovered";
+    }
+  } catch (error) {
+    message = `Failed to execute query: ${error.message}`;
+  }
+  // Responses
+  isSuccess ? res.status(200).json(result) : res.status(400).json({ message });
 };
 
 // Endpoints -------------------------------------
 
-app.get("/api/drugs", (req, res) => getDrugController(req, res, null));
-app.get("/api/drugs/:id", (req, res) => getDrugController(req, res, null));
+// Prescriptions
+app.get("/api/prescriptions", (req, res) =>
+  getPrescriptionsController(req, res, null)
+);
+app.get("/api/prescriptions/:id", (req, res) =>
+  getPrescriptionsController(req, res, null)
+);
+app.get("/api/prescriptions/drug/:id", (req, res) =>
+  getPrescriptionsController(req, res, "drug")
+);
+
+// Drugs
+app.get("/api/drugs", (req, res) => getDrugsController(req, res, null));
+app.get("/api/drugs/:id", (req, res) => getDrugsController(req, res, null));
 
 // Start server ----------------------------------
 

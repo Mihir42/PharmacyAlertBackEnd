@@ -22,6 +22,25 @@ app.use(function (req, res, next) {
 app.use(cors({ origin: "*" }));
 // Controllers -----------------------------------
 
+const read = async (selectSql) => {
+  try {
+    const [result] = await database.query(selectSql);
+    return result.length === 0
+      ? { isSuccess: false, result: null, message: "No record(s) found" }
+      : {
+          isSuccess: true,
+          result: result,
+          message: "Record(s) successfully recovered",
+        };
+  } catch (error) {
+    return {
+      isSuccess: false,
+      result: null,
+      message: `Failed to execute query: ${error.message}`,
+    };
+  }
+};
+
 const buildPrescriptionsSelectSql = (id, variant) => {
   let sql = "";
   let table =
@@ -69,46 +88,29 @@ const buildDrugsSelectSQL = (id, variant) => {
 
 const getPrescriptionsController = async (req, res, variant) => {
   const id = req.params.id;
-  // Build SQL
+  // Validate request
+
+  // Access Data
   const sql = buildPrescriptionsSelectSql(id, variant);
-  // Execute Query
-  let isSuccess = false;
-  let message = "";
-  let result = null;
-  try {
-    [result] = await database.query(sql);
-    if (result.length === 0) message = "No record(s) found";
-    else {
-      isSuccess = true;
-      message = "Record(s) successfully recovered";
-    }
-  } catch (error) {
-    message = `Failed to execute query: ${error.message}`;
-  }
-  //Responses
-  isSuccess ? res.status(200).json(result) : res.status(400).json({ message });
+  const { isSuccess, result, message } = await read(sql);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(200).json(result);
 };
 
 const getDrugsController = async (req, res, variant) => {
   const id = req.params.id;
-  //Build SQL
+
+  // Validate request
+
+  // Access Data
   const sql = buildDrugsSelectSQL(id, variant);
-  // Execute Query
-  let isSuccess = false;
-  let message = "";
-  let result = null;
-  try {
-    [result] = await database.query(sql);
-    if (result.length === 0) message = "No record(s) found";
-    else {
-      isSuccess = true;
-      message = "Record(s) successfully recovered";
-    }
-  } catch (error) {
-    message = `Failed to execute query: ${error.message}`;
-  }
-  // Responses
-  isSuccess ? res.status(200).json(result) : res.status(400).json({ message });
+  const { isSuccess, result, message } = await read(sql);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(200).json(result);
 };
 
 // Endpoints -------------------------------------

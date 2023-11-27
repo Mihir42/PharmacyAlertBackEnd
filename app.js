@@ -25,12 +25,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Controllers -----------------------------------
 
-
-
 const create = async (selectSql, record) => {
   try {
-    const status = await database.query(selectSql,record);
-
+    const status = await database.query(selectSql, record);
     const recoverRecordSql = buildDrugsSelectSQL(status[0].insertId, null);
 
     const { isSuccess, result, message } = await read(recoverRecordSql);
@@ -74,6 +71,8 @@ const read = async (selectSql) => {
   }
 };
 
+// Prescriptions
+
 const buildPrescriptionsSelectSql = (id, variant) => {
   let sql = "";
   let table =
@@ -100,6 +99,8 @@ const buildPrescriptionsSelectSql = (id, variant) => {
   return sql;
 };
 
+// Drugs
+
 const buildDrugsSelectSQL = (id, variant) => {
   let sql = "";
   let table = "drugs";
@@ -115,23 +116,44 @@ const buildDrugsSelectSQL = (id, variant) => {
       sql = `SELECT ${fields} FROM ${table}`;
       if (id) sql += ` WHERE DrugID=${id}`;
   }
-  console.log(id);
   return sql;
 };
 
 const buildDrugsInsertSQL = (record) => {
   let table = "drugs";
-  let mutableFields = [
-    "DrugName",
-    "DrugDosage",
-    "DrugSymptoms",
-  ];
+  let mutableFields = ["DrugName", "DrugDosage", "DrugSymptoms"];
 
   return `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
 };
 
-const buildSetDrugFields = (fields) => fields.reduce((setSQL, field, index) =>
-      setSQL + `${field}=:${field}` + ((index === fields.length - 1) ? "" : ", "), "SET ");
+const buildSetDrugFields = (fields) =>
+  fields.reduce(
+    (setSQL, field, index) =>
+      setSQL + `${field}=:${field}` + (index === fields.length - 1 ? "" : ", "),
+    "SET "
+  );
+
+// Patients
+
+const buildPatientsSelectSQL = (id, variant) => {
+  let sql = "";
+  let table = "patients";
+  let fields = [
+    "patients.PatientID",
+    "patients.PatientFirstName",
+    "patients.PatientLastName",
+    "patients.PatientAddress",
+    "patients.PatientPhoneNumber",
+    "patients.PatientEmailAddress",
+  ];
+
+  switch (variant) {
+    default:
+      sql = `SELECT ${fields} FROM ${table}`;
+      if (id) sql += ` WHERE PatientID=${id}`;
+  }
+  return sql;
+};
 
 const getPrescriptionsController = async (req, res, variant) => {
   const id = req.params.id;
@@ -172,6 +194,19 @@ const postDrugsController = async (req, res) => {
   res.status(201).json(result);
 };
 
+const getPatientsController = async (req, res, varaint) => {
+  const id = req.params.id;
+
+  // validate request
+  // Access data
+  const sql = buildPatientsSelectSQL(id, varaint);
+  const { isSuccess, result, message } = await read(sql);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Reponse to request
+  res.status(200).json(result);
+};
+
 // Endpoints -------------------------------------
 
 // Prescriptions
@@ -188,8 +223,14 @@ app.get("/api/prescriptions/drug/:id", (req, res) =>
 // Drugs
 app.get("/api/drugs", (req, res) => getDrugsController(req, res, null));
 app.get("/api/drugs/:id", (req, res) => getDrugsController(req, res, null));
-
 app.post("/api/drugs", postDrugsController);
+
+// Patients
+
+app.get("/api/patients", (req, res) => getPatientsController(req, res, null));
+app.get("/api/patients/:id", (req, res) =>
+  getPatientsController(req, res, null)
+);
 
 // Start server ----------------------------------
 

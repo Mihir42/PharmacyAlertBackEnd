@@ -29,7 +29,6 @@ const create = async (selectSql, record) => {
   try {
     const status = await database.query(selectSql, record);
     const recoverRecordSql = buildDrugsSelectSQL(status[0].insertId, null);
-
     const { isSuccess, result, message } = await read(recoverRecordSql);
 
     return isSuccess
@@ -61,6 +60,64 @@ const read = async (selectSql) => {
           isSuccess: true,
           result: result,
           message: "Record(s) successfully recovered",
+        };
+  } catch (error) {
+    return {
+      isSuccess: false,
+      result: null,
+      message: `Failed to execute query: ${error.message}`,
+    };
+  }
+};
+
+const updateDrugs = async (sql, id, record) => {
+  try {
+    const status = await database.query(sql, { ...record, DrugID: id });
+
+    if (status[0].affectedRows === 0)
+      return {
+        isSuccess: false,
+        result: null,
+        message: `Failed to update record: no rows affected `,
+      };
+
+    const recoverRecordSql = buildDrugsSelectSQL(id, null);
+
+    const { isSuccess, result, message } = await read(recoverRecordSql);
+
+    return isSuccess
+      ? {
+          isSuccess: true,
+          result: result,
+          message: "Record successfully recovered",
+        }
+      : {
+          isSuccess: false,
+          result: null,
+          message: `Failed to recover the updated record ${message}`,
+        };
+  } catch (error) {
+    return {
+      isSuccess: false,
+      result: null,
+      message: `Failed to execute query: ${error.message}`,
+    };
+  }
+};
+
+const deleteDrugs = async (sql, id) => {
+  try {
+    const status = await database.query(sql, { DrugID: id });
+    return status[0].affectedRows === 0
+      ? {
+          isSuccess: false,
+          result: null,
+          message: `Failed to delete record ${id}`,
+        }
+      : {
+          isSuccess: true,
+          result: null,
+          message: "Record successfully deleted",
         };
   } catch (error) {
     return {
@@ -119,11 +176,27 @@ const buildDrugsSelectSQL = (id, variant) => {
   return sql;
 };
 
-const buildDrugsInsertSQL = (record) => {
+const buildDrugsInsertSQL = () => {
   let table = "drugs";
   let mutableFields = ["DrugName", "DrugDosage", "DrugSymptoms"];
 
   return `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
+};
+
+const buildDrugsUpdateSQL = () => {
+  let table = "drugs";
+  let mutableFields = ["DrugName", "DrugDosage", "DrugSymptoms"];
+
+  return (
+    `UPDATE ${table} ` +
+    buildSetDrugFields(mutableFields) +
+    ` WHERE DrugID=:DrugID`
+  );
+};
+
+const buildDrugsDeleteSQL = () => {
+  let table = "drugs";
+  return `DELETE FROM ${table} WHERE DrugID=:DrugID`;
 };
 
 const buildSetDrugFields = (fields) =>
@@ -194,6 +267,33 @@ const postDrugsController = async (req, res) => {
   res.status(201).json(result);
 };
 
+const putDrugsController = async (req, res) => {
+  // Validate request
+  const id = req.params.id;
+  const record = req.body;
+
+  // Access Data
+  const sql = buildDrugsUpdateSQL();
+  const { isSuccess, result, message } = await updateDrugs(sql, id, record);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(200).json(result);
+};
+
+const deleteDrugsController = async (req, res) => {
+  // Validate request
+  const id = req.params.id;
+
+  // Access Data
+  const sql = buildDrugsDeleteSQL();
+  const { isSuccess, result, message } = await deleteDrugs(sql, id);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(204).json(message);
+};
+
 const getPatientsController = async (req, res, varaint) => {
   const id = req.params.id;
 
@@ -223,7 +323,12 @@ app.get("/api/prescriptions/drug/:id", (req, res) =>
 // Drugs
 app.get("/api/drugs", (req, res) => getDrugsController(req, res, null));
 app.get("/api/drugs/:id", (req, res) => getDrugsController(req, res, null));
+
 app.post("/api/drugs", postDrugsController);
+
+app.put("/api/drugs/:id", putDrugsController);
+
+app.delete("/api/drugs/:id", deleteDrugsController);
 
 // Patients
 

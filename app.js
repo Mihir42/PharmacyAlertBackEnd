@@ -25,11 +25,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Controllers -----------------------------------
 
-const create = async (selectSql, record) => {
+const create = async (createQuery) => {
   try {
-    const status = await database.query(selectSql, record);
-    const recoverRecordSql = buildDrugsSelectSQL(status[0].insertId, null);
-    const { isSuccess, result, message } = await read(recoverRecordSql);
+    const status = await database.query(createQuery.sql, createQuery.data);
+    const readQuery = buildDrugsReadQuery(status[0].insertId, null);
+    const { isSuccess, result, message } = await read(readQuery);
 
     return isSuccess
       ? {
@@ -51,9 +51,9 @@ const create = async (selectSql, record) => {
   }
 };
 
-const read = async (selectSql) => {
+const read = async (query) => {
   try {
-    const [result] = await database.query(selectSql);
+    const [result] = await database.query(query.sql, query.data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
       : {
@@ -70,9 +70,9 @@ const read = async (selectSql) => {
   }
 };
 
-const updateDrugs = async (sql, id, record) => {
+const updateDrugs = async (updateQuery) => {
   try {
-    const status = await database.query(sql, { ...record, DrugID: id });
+    const status = await database.query(updateQuery.sql, updateQuery.data);
 
     if (status[0].affectedRows === 0)
       return {
@@ -81,9 +81,9 @@ const updateDrugs = async (sql, id, record) => {
         message: `Failed to update record: no rows affected `,
       };
 
-    const recoverRecordSql = buildDrugsSelectSQL(id, null);
+    const readQuery = buildDrugsReadQuery(updateQuery.data.DrugID, null);
 
-    const { isSuccess, result, message } = await read(recoverRecordSql);
+    const { isSuccess, result, message } = await read(readQuery);
 
     return isSuccess
       ? {
@@ -105,9 +105,9 @@ const updateDrugs = async (sql, id, record) => {
   }
 };
 
-const deleteDrugs = async (sql, id) => {
+const deleteDrugs = async (deleteQuery) => {
   try {
-    const status = await database.query(sql, { DrugID: id });
+    const status = await database.query(deleteQuery.sql, deleteQuery.data);
     return status[0].affectedRows === 0
       ? {
           isSuccess: false,
@@ -128,9 +128,10 @@ const deleteDrugs = async (sql, id) => {
   }
 };
 
+// SQL prepared statements builders
 // Prescriptions
 
-const buildPrescriptionsSelectSql = (id, variant) => {
+const buildPrescriptionsReadQuery = (id, variant) => {
   let sql = "";
   let table =
     "(((drugs INNER JOIN prescriptions ON drugs.DrugID = prescriptions.PrescriptionsDrugID) INNER JOIN prescribeddrugs on prescriptions.PrescriptionPrescribedDrugID = prescribeddrugs.PrescribeddrugsID ) INNER JOIN patients ON prescribeddrugs.PrescribeddrugsPatientID = patients.PatientID) ";
@@ -146,19 +147,19 @@ const buildPrescriptionsSelectSql = (id, variant) => {
 
   switch (variant) {
     case "drug":
-      sql = `SELECT ${fields} FROM ${table} WHERE DrugID=${id}`;
+      sql = `SELECT ${fields} FROM ${table} WHERE DrugID=:ID`;
       break;
     default:
       sql = `SELECT ${fields} FROM ${table}`;
-      if (id) sql += `WHERE PatientID=${id}`;
+      if (id) sql += `WHERE PatientID=:ID`;
   }
 
-  return sql;
+  return { sql: sql, data: { ID: id } };
 };
 
 // Drugs
 
-const buildDrugsSelectSQL = (id, variant) => {
+const buildDrugsReadQuery = (id, variant) => {
   let sql = "";
   let table = "drugs";
   let fields = [
@@ -171,32 +172,34 @@ const buildDrugsSelectSQL = (id, variant) => {
   switch (variant) {
     default:
       sql = `SELECT ${fields} FROM ${table}`;
-      if (id) sql += ` WHERE DrugID=${id}`;
+      if (id) sql += ` WHERE DrugID=:ID`;
   }
-  return sql;
+  return { sql: sql, data: { ID: id } };
 };
 
-const buildDrugsInsertSQL = () => {
+const buildDrugsCreateSQL = (record) => {
   let table = "drugs";
   let mutableFields = ["DrugName", "DrugDosage", "DrugSymptoms"];
 
-  return `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
+  const sql = `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
+  return { sql, data: record };
 };
 
-const buildDrugsUpdateSQL = () => {
+const buildDrugsUpdateQuery = (record, id) => {
   let table = "drugs";
   let mutableFields = ["DrugName", "DrugDosage", "DrugSymptoms"];
 
-  return (
+  const sql =
     `UPDATE ${table} ` +
     buildSetDrugFields(mutableFields) +
-    ` WHERE DrugID=:DrugID`
-  );
+    ` WHERE DrugID=:DrugID`;
+  return { sql, data: { ...record, DrugID: id } };
 };
 
-const buildDrugsDeleteSQL = () => {
+const buildDrugsDeleteQuery = (id) => {
   let table = "drugs";
-  return `DELETE FROM ${table} WHERE DrugID=:DrugID`;
+  const sql = `DELETE FROM ${table} WHERE DrugID=:DrugID`;
+  return { sql, data: { DrugID: id } };
 };
 
 const buildSetDrugFields = (fields) =>
@@ -208,7 +211,7 @@ const buildSetDrugFields = (fields) =>
 
 // Patients
 
-const buildPatientsSelectSQL = (id, variant) => {
+const buildPatientsReadQuery = (id, variant) => {
   let sql = "";
   let table = "patients";
   let fields = [
@@ -223,9 +226,9 @@ const buildPatientsSelectSQL = (id, variant) => {
   switch (variant) {
     default:
       sql = `SELECT ${fields} FROM ${table}`;
-      if (id) sql += ` WHERE PatientID=${id}`;
+      if (id) sql += ` WHERE PatientID=:ID`;
   }
-  return sql;
+  return { sql: sql, data: { ID: id } };
 };
 
 const getPrescriptionsController = async (req, res, variant) => {
@@ -233,8 +236,8 @@ const getPrescriptionsController = async (req, res, variant) => {
   // Validate request
 
   // Access Data
-  const sql = buildPrescriptionsSelectSql(id, variant);
-  const { isSuccess, result, message } = await read(sql);
+  const query = buildPrescriptionsReadQuery(id, variant);
+  const { isSuccess, result, message } = await read(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -247,8 +250,8 @@ const getDrugsController = async (req, res, variant) => {
   // Validate request
 
   // Access Data
-  const sql = buildDrugsSelectSQL(id, variant);
-  const { isSuccess, result, message } = await read(sql);
+  const query = buildDrugsReadQuery(id, variant);
+  const { isSuccess, result, message } = await read(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -256,11 +259,12 @@ const getDrugsController = async (req, res, variant) => {
 };
 
 const postDrugsController = async (req, res) => {
+  const record = req.body;
   // Validate request
 
   // Access Data
-  const sql = buildDrugsInsertSQL(req.body);
-  const { isSuccess, result, message } = await create(sql, req.body);
+  const query = buildDrugsCreateSQL(record);
+  const { isSuccess, result, message } = await create(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -268,13 +272,14 @@ const postDrugsController = async (req, res) => {
 };
 
 const putDrugsController = async (req, res) => {
-  // Validate request
   const id = req.params.id;
   const record = req.body;
 
+  // Validate request
+
   // Access Data
-  const sql = buildDrugsUpdateSQL();
-  const { isSuccess, result, message } = await updateDrugs(sql, id, record);
+  const query = buildDrugsUpdateQuery(record, id);
+  const { isSuccess, result, message } = await updateDrugs(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -286,8 +291,8 @@ const deleteDrugsController = async (req, res) => {
   const id = req.params.id;
 
   // Access Data
-  const sql = buildDrugsDeleteSQL();
-  const { isSuccess, result, message } = await deleteDrugs(sql, id);
+  const query = buildDrugsDeleteQuery(id);
+  const { isSuccess, result, message } = await deleteDrugs(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -299,8 +304,8 @@ const getPatientsController = async (req, res, varaint) => {
 
   // validate request
   // Access data
-  const sql = buildPatientsSelectSQL(id, varaint);
-  const { isSuccess, result, message } = await read(sql);
+  const query = buildPatientsReadQuery(id, varaint);
+  const { isSuccess, result, message } = await read(query);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Reponse to request
@@ -331,7 +336,6 @@ app.put("/api/drugs/:id", putDrugsController);
 app.delete("/api/drugs/:id", deleteDrugsController);
 
 // Patients
-
 app.get("/api/patients", (req, res) => getPatientsController(req, res, null));
 app.get("/api/patients/:id", (req, res) =>
   getPatientsController(req, res, null)

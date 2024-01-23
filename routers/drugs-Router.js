@@ -109,7 +109,7 @@ const updateDrugs = async (updateQuery) => {
       return {
         isSuccess: false,
         result: null,
-        message: `Failed to update record: no rows affected `,
+        message: `Failed to update record: no rows affected`,
       };
 
     const readQuery = buildDrugsReadQuery(updateQuery.data.DrugID, null);

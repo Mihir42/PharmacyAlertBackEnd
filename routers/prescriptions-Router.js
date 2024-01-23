@@ -56,6 +56,25 @@ const buildPrescriptionsCreateQuery = (record) => {
   return { sql, data: record };
 };
 
+const buildPrescriptionsUpdateQuery = (record, id) => {
+  let table = "prescriptions";
+  let mutableFields = [
+    "PrescriptionsStartDate",
+    "PrescriptionsEndDate",
+    "PrescriptionsDrugID",
+    "Prescriptions_Dose",
+    "Prescriptions_Frequency",
+    "Prescriptions_Additional_Information",
+    "Prescriptions_Patient_ID",
+  ];
+
+  const sql =
+    `UPDATE ${table} ` +
+    buildSetPrescriptionsField(mutableFields) +
+    ` WHERE Prescriptions_ID=:Prescriptions_ID`;
+  return { sql, data: { ...record, Prescriptions_ID: id } };
+};
+
 // Data accessors -------------------------------------
 const create = async (createQuery) => {
   try {
@@ -102,6 +121,44 @@ const read = async (query) => {
   }
 };
 
+const updatePrescriptions = async (updateQuery) => {
+  try {
+    const status = await database.query(updateQuery.sql, updateQuery.data);
+
+    if (status[0].affectedRows === 0)
+      return {
+        isSuccess: false,
+        result: null,
+        message: `Failed to update record: no rows affected`,
+      };
+
+    const readQuery = buildPrescriptionsReadQuery(
+      updateQuery.data.Prescriptions_ID,
+      null
+    );
+
+    const { isSuccess, result, message } = await read(readQuery);
+
+    return isSuccess
+      ? {
+          isSuccess: true,
+          result: result,
+          message: `Record successfully recovered`,
+        }
+      : {
+          isSuccess: false,
+          result: null,
+          message: `Failed to execute query: ${message}`,
+        };
+  } catch (error) {
+    return {
+      isSuccess: false,
+      result: null,
+      message: `Failed to execute query: ${error.message}`,
+    };
+  }
+};
+
 // Controllers -------------------------------------
 const getPrescriptionsController = async (req, res, variant) => {
   const id = req.params.id;
@@ -129,6 +186,22 @@ const postPrescriptionsController = async (req, res) => {
   res.status(201).json(result);
 };
 
+const putPrescriptionsController = async (req, res) => {
+  const id = req.params.id;
+  const record = req.body;
+
+  // Validate request
+
+  // Access Data
+
+  const query = buildPrescriptionsUpdateQuery(record, id);
+  const { isSuccess, result, message } = await updatePrescriptions(query);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(200).json(result);
+};
+
 // Endpoints -------------------------------------
 router.get("/", (req, res) => getPrescriptionsController(req, res, null));
 router.get("/:id", (req, res) => getPrescriptionsController(req, res, null));
@@ -136,5 +209,6 @@ router.get("/patients/:id", (req, res) =>
   getPrescriptionsController(req, res, "patients")
 );
 router.post("/", postPrescriptionsController);
+router.put("/:id", putPrescriptionsController);
 
 export default router;

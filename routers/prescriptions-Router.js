@@ -75,6 +75,12 @@ const buildPrescriptionsUpdateQuery = (record, id) => {
   return { sql, data: { ...record, Prescriptions_ID: id } };
 };
 
+const buildPrescriptionsDeleteQuery = (id) => {
+  let table = "prescriptions";
+  const sql = `DELETE FROM ${table} WHERE Prescriptions_ID=:Prescriptions_ID`;
+  return { sql, data: { Prescriptions_ID: id } };
+};
+
 // Data accessors -------------------------------------
 const create = async (createQuery) => {
   try {
@@ -159,6 +165,29 @@ const updatePrescriptions = async (updateQuery) => {
   }
 };
 
+const deletePrescriptions = async (deleteQuery) => {
+  try {
+    const status = await database.query(deleteQuery.sql, deleteQuery.data);
+    return status[0].affectedRows === 0
+      ? {
+          isSuccess: false,
+          result: null,
+          message: `Failed to delete record ${id}`,
+        }
+      : {
+          isSuccess: true,
+          result: null,
+          message: `Record deleted successfully`,
+        };
+  } catch (error) {
+    return {
+      isSuccess: false,
+      result: null,
+      message: `Failed to execute query: ${error.message}`,
+    };
+  }
+};
+
 // Controllers -------------------------------------
 const getPrescriptionsController = async (req, res, variant) => {
   const id = req.params.id;
@@ -202,6 +231,19 @@ const putPrescriptionsController = async (req, res) => {
   res.status(200).json(result);
 };
 
+const deletePrescriptionsController = async (req, res) => {
+  // Validate request
+  const id = req.params.id;
+
+  // Access data
+  const query = buildPrescriptionsDeleteQuery(id);
+  const { isSuccess, result, message } = await deletePrescriptions(query);
+  if (!isSuccess) return res.status(404).json({ message });
+
+  // Response to request
+  res.status(204).json(message);
+};
+
 // Endpoints -------------------------------------
 router.get("/", (req, res) => getPrescriptionsController(req, res, null));
 router.get("/:id", (req, res) => getPrescriptionsController(req, res, null));
@@ -210,5 +252,6 @@ router.get("/patients/:id", (req, res) =>
 );
 router.post("/", postPrescriptionsController);
 router.put("/:id", putPrescriptionsController);
+router.delete("/:id", deletePrescriptionsController);
 
 export default router;

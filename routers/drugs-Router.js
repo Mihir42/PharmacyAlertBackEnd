@@ -45,13 +45,13 @@ const buildDrugsUpdateQuery = (record, id) => {
     `UPDATE ${table} ` +
     buildSetDrugFields(mutableFields) +
     ` WHERE Drugs_ID=:Drugs_ID`;
-  return { sql, data: { ...record, DrugID: id } };
+  return { sql, data: { ...record, Drugs_ID: id } };
 };
 
 const buildDrugsDeleteQuery = (id) => {
   let table = "drugs";
   const sql = `DELETE FROM ${table} WHERE Drugs_ID=:Drugs_ID`;
-  return { sql, data: { DrugID: id } };
+  return { sql, data: { Drugs_ID: id } };
 };
 
 // Data accessors -------------------------------------

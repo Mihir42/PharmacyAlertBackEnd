@@ -4,6 +4,11 @@ import database from "../database.js";
 const router = Router();
 // Query builders -------------------------------------
 
+const table = "drugs";
+const mutableFields = ["Drugs_Name", "Drugs_Route", "Drugs_Side_Affects"];
+const idField = "Drugs_ID";
+const fields = [idField, ...mutableFields];
+
 const buildSetDrugFields = (fields) =>
   fields.reduce(
     (setSQL, field, index) =>
@@ -11,11 +16,17 @@ const buildSetDrugFields = (fields) =>
     "SET "
   );
 
-const buildDrugsReadQuery = (id, variant) => {
+const buildCreateQuery = (record) => {
+  const sql = `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
+  return { sql, data: record };
+};
+
+const buildReadQuery = (id, variant) => {
   let sql = "";
-  let table = "drugs";
-  let fields = [
-    "drugs.Drugs_ID",
+  const resolvedTable = "drugs";
+  const resolvedFields = [
+    idField,
+    ...mutableFields,
     "drugs.Drugs_Name",
     "drugs.Drugs_Route",
     "drugs.Drugs_Side_Affects",
@@ -23,44 +34,32 @@ const buildDrugsReadQuery = (id, variant) => {
 
   switch (variant) {
     default:
-      sql = `SELECT ${fields} FROM ${table}`;
+      sql = `SELECT ${resolvedFields} FROM ${resolvedTable}`;
       if (id) sql += ` WHERE Drugs_ID=:ID`;
   }
   return { sql: sql, data: { ID: id } };
 };
 
-const buildDrugsCreateQuery = (record) => {
-  let table = "drugs";
-  let mutableFields = ["Drugs_Name", "Drugs_Route", "Drugs_Side_Affects"];
-
-  const sql = `INSERT INTO ${table} ` + buildSetDrugFields(mutableFields);
-  return { sql, data: record };
-};
-
-const buildDrugsUpdateQuery = (record, id) => {
-  let table = "drugs";
-  let mutableFields = ["Drugs_Name", "Drugs_Route", "Drugs_Side_Affects"];
-
+const buildUpdateQuery = (record, id) => {
   const sql =
     `UPDATE ${table} ` +
     buildSetDrugFields(mutableFields) +
-    ` WHERE Drugs_ID=:Drugs_ID`;
-  return { sql, data: { ...record, Drugs_ID: id } };
+    ` WHERE ${idField}=:${idField}`;
+  return { sql, data: { ...record, [idField]: id } };
 };
 
-const buildDrugsDeleteQuery = (id) => {
-  let table = "drugs";
-  const sql = `DELETE FROM ${table} WHERE Drugs_ID=:Drugs_ID`;
-  return { sql, data: { Drugs_ID: id } };
+const buildDeleteQuery = (id) => {
+  const sql = `DELETE FROM ${table} WHERE ${idField}=:${idField}`;
+  return { sql, data: { [idField]: id } };
 };
 
 // Data accessors -------------------------------------
 
-const create = async (createQuery) => {
+const create = async (record) => {
   try {
-    const status = await database.query(createQuery.sql, createQuery.data);
-    const readQuery = buildDrugsReadQuery(status[0].insertId, null);
-    const { isSuccess, result, message } = await read(readQuery);
+    const { sql, data } = buildCreateQuery(record);
+    const status = await database.query(sql, data);
+    const { isSuccess, result, message } = await read(status[0].insertId, null);
 
     return isSuccess
       ? {
@@ -82,9 +81,10 @@ const create = async (createQuery) => {
   }
 };
 
-const read = async (query) => {
+const read = async (id, variant) => {
   try {
-    const [result] = await database.query(query.sql, query.data);
+    const { sql, data } = buildReadQuery(id, variant);
+    const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
       : {
@@ -101,9 +101,10 @@ const read = async (query) => {
   }
 };
 
-const updateDrugs = async (updateQuery) => {
+const update = async (record, id) => {
   try {
-    const status = await database.query(updateQuery.sql, updateQuery.data);
+    const { sql, data } = buildUpdateQuery(record, id);
+    const status = await database.query(sql, data);
 
     if (status[0].affectedRows === 0)
       return {
@@ -112,9 +113,7 @@ const updateDrugs = async (updateQuery) => {
         message: `Failed to update record: no rows affected`,
       };
 
-    const readQuery = buildDrugsReadQuery(updateQuery.data.DrugID, null);
-
-    const { isSuccess, result, message } = await read(readQuery);
+    const { isSuccess, result, message } = await read(id, null);
 
     return isSuccess
       ? {
@@ -136,9 +135,10 @@ const updateDrugs = async (updateQuery) => {
   }
 };
 
-const deleteDrugs = async (deleteQuery) => {
+const _delete = async (id) => {
   try {
-    const status = await database.query(deleteQuery.sql, deleteQuery.data);
+    const { sql, data } = buildDeleteQuery(id);
+    const status = await database.query(sql, data);
     return status[0].affectedRows === 0
       ? {
           isSuccess: false,
@@ -167,8 +167,8 @@ const getDrugsController = async (req, res, variant) => {
   // Validate request
 
   // Access Data
-  const query = buildDrugsReadQuery(id, variant);
-  const { isSuccess, result, message } = await read(query);
+
+  const { isSuccess, result, message } = await read(id, variant);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -180,8 +180,8 @@ const postDrugsController = async (req, res) => {
   // Validate request
 
   // Access Data
-  const query = buildDrugsCreateQuery(record);
-  const { isSuccess, result, message } = await create(query);
+
+  const { isSuccess, result, message } = await create(record);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -195,8 +195,8 @@ const putDrugsController = async (req, res) => {
   // Validate request
 
   // Access Data
-  const query = buildDrugsUpdateQuery(record, id);
-  const { isSuccess, result, message } = await updateDrugs(query);
+
+  const { isSuccess, result, message } = await update(record, id);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -208,8 +208,7 @@ const deleteDrugsController = async (req, res) => {
   const id = req.params.id;
 
   // Access Data
-  const query = buildDrugsDeleteQuery(id);
-  const { isSuccess, result, message } = await deleteDrugs(query);
+  const { isSuccess, result, message } = await _delete(id);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request

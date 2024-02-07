@@ -32,9 +32,10 @@ const buildPrescriptionsReadQuery = (id, variant) => {
 
 // Data accessors -------------------------------------
 
-const read = async (query) => {
+const read = async (id, varaint) => {
   try {
-    const [result] = await database.query(query.sql, query.data);
+    const { sql, data } = buildPrescriptionsReadQuery(id, varaint);
+    const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
       : {
@@ -58,8 +59,7 @@ const getPharmacistController = async (req, res, variant) => {
   // Validate request
 
   // Access Data
-  const query = buildPrescriptionsReadQuery(id, variant);
-  const { isSuccess, result, message } = await read(query);
+  const { isSuccess, result, message } = await read(id, variant);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to status

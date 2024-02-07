@@ -82,11 +82,11 @@ const buildPrescriptionsDeleteQuery = (id) => {
 };
 
 // Data accessors -------------------------------------
-const create = async (createQuery) => {
+const create = async (record) => {
   try {
-    const status = await database.query(createQuery.sql, createQuery.data);
-    const readQuery = buildPrescriptionsReadQuery(status[0].insertId, null);
-    const { isSuccess, result, message } = await read(readQuery);
+    const { sql, data } = buildPrescriptionsCreateQuery(record);
+    const status = await database.query(sql, data);
+    const { isSuccess, result, message } = await read(status[0].insertId, null);
 
     return isSuccess
       ? {
@@ -108,9 +108,10 @@ const create = async (createQuery) => {
   }
 };
 
-const read = async (query) => {
+const read = async (id, variant) => {
   try {
-    const [result] = await database.query(query.sql, query.data);
+    const { sql, data } = buildPrescriptionsReadQuery(id, variant);
+    const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
       : {
@@ -127,9 +128,10 @@ const read = async (query) => {
   }
 };
 
-const updatePrescriptions = async (updateQuery) => {
+const update = async (record, id) => {
   try {
-    const status = await database.query(updateQuery.sql, updateQuery.data);
+    const { sql, data } = buildPrescriptionsUpdateQuery(record, id);
+    const status = await database.query(sql, data);
 
     if (status[0].affectedRows === 0)
       return {
@@ -138,12 +140,7 @@ const updatePrescriptions = async (updateQuery) => {
         message: `Failed to update record: no rows affected`,
       };
 
-    const readQuery = buildPrescriptionsReadQuery(
-      updateQuery.data.Prescriptions_ID,
-      null
-    );
-
-    const { isSuccess, result, message } = await read(readQuery);
+    const { isSuccess, result, message } = await read(id, null);
 
     return isSuccess
       ? {
@@ -165,9 +162,10 @@ const updatePrescriptions = async (updateQuery) => {
   }
 };
 
-const deletePrescriptions = async (deleteQuery) => {
+const _delete = async (id) => {
   try {
-    const status = await database.query(deleteQuery.sql, deleteQuery.data);
+    const { sql, data } = buildPrescriptionsDeleteQuery(id);
+    const status = await database.query(sql, data);
     return status[0].affectedRows === 0
       ? {
           isSuccess: false,
@@ -194,8 +192,7 @@ const getPrescriptionsController = async (req, res, variant) => {
   // Validate request
 
   // Access Data
-  const query = buildPrescriptionsReadQuery(id, variant);
-  const { isSuccess, result, message } = await read(query);
+  const { isSuccess, result, message } = await read(id, variant);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -207,8 +204,7 @@ const postPrescriptionsController = async (req, res) => {
   // Validate request
 
   // Access Data
-  const query = buildPrescriptionsCreateQuery(record);
-  const { isSuccess, result, message } = await create(query);
+  const { isSuccess, result, message } = await create(record);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -223,8 +219,7 @@ const putPrescriptionsController = async (req, res) => {
 
   // Access Data
 
-  const query = buildPrescriptionsUpdateQuery(record, id);
-  const { isSuccess, result, message } = await updatePrescriptions(query);
+  const { isSuccess, result, message } = await update(record, id);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request
@@ -236,8 +231,7 @@ const deletePrescriptionsController = async (req, res) => {
   const id = req.params.id;
 
   // Access data
-  const query = buildPrescriptionsDeleteQuery(id);
-  const { isSuccess, result, message } = await deletePrescriptions(query);
+  const { isSuccess, result, message } = await _delete(id);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Response to request

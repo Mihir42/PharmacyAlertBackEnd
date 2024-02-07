@@ -24,9 +24,10 @@ const buildPatientsReadQuery = (id, variant) => {
 };
 
 // Data accessors -------------------------------------
-const read = async (query) => {
+const read = async (id, varaint) => {
   try {
-    const [result] = await database.query(query.sql, query.data);
+    const { sql, data } = buildPatientsReadQuery(id, varaint);
+    const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
       : {
@@ -49,8 +50,7 @@ const getPatientsController = async (req, res, varaint) => {
 
   // validate request
   // Access data
-  const query = buildPatientsReadQuery(id, varaint);
-  const { isSuccess, result, message } = await read(query);
+  const { isSuccess, result, message } = await read(id, varaint);
   if (!isSuccess) return res.status(404).json({ message });
 
   // Reponse to request

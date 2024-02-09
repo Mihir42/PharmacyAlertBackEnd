@@ -11,10 +11,23 @@ const buildSetPrescriptionFields = (fields) =>
     "SET "
   );
 
-const buildPrescriptionsReadQuery = (id, variant) => {
+const table = "pharmacists";
+const mutableFields = [
+  "pharmacists.Pharmacist_ID",
+  "pharmacists.Pharmacist_First_Name",
+  "pharmacists.Pharmacist_Last_Name",
+  "pharmacists.Pharmacist_E_Mail",
+  "pharmacists.Pharmacist_Manager",
+];
+const idField = "pharmacists.Pharmacist_ID";
+const fields = [idField, mutableFields];
+
+const buildReadQuery = (id, variant) => {
   let sql = "";
-  let table = "pharmacists";
-  let fields = [
+  const resolvedTable = "pharmacists";
+  const resolvedFields = [
+    idField,
+    ...mutableFields,
     "pharmacists.Pharmacist_ID",
     "pharmacists.Pharmacist_First_Name",
     "pharmacists.Pharmacist_Last_Name",
@@ -24,7 +37,7 @@ const buildPrescriptionsReadQuery = (id, variant) => {
 
   switch (variant) {
     default:
-      sql = `SELECT ${fields} FROM ${table}`;
+      sql = `SELECT ${resolvedFields} FROM ${resolvedTable}`;
       if (id) sql += ` WHERE Pharmacist_ID=:ID`;
   }
   return { sql: sql, data: { ID: id } };
@@ -34,7 +47,7 @@ const buildPrescriptionsReadQuery = (id, variant) => {
 
 const read = async (id, varaint) => {
   try {
-    const { sql, data } = buildPrescriptionsReadQuery(id, varaint);
+    const { sql, data } = buildReadQuery(id, varaint);
     const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }

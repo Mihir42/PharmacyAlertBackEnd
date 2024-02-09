@@ -3,10 +3,25 @@ import database from "../database.js";
 
 const router = Router();
 // Query builders -------------------------------------
-const buildPatientsReadQuery = (id, variant) => {
+
+const table = "patients";
+const mutableFields = [
+  "patients.PatientID",
+  "patients.PatientFirstName",
+  "patients.PatientLastName",
+  "patients.PatientAddress",
+  "patients.PatientPhoneNumber",
+  "patients.PatientEmailAddress",
+];
+const idField = "PatientID";
+const fields = [idField, ...mutableFields];
+
+const buildReadQuery = (id, variant) => {
   let sql = "";
-  let table = "patients";
-  let fields = [
+  const resolvedTable = "patients";
+  const resolvedFields = [
+    idField,
+    ...mutableFields,
     "patients.PatientID",
     "patients.PatientFirstName",
     "patients.PatientLastName",
@@ -17,7 +32,7 @@ const buildPatientsReadQuery = (id, variant) => {
 
   switch (variant) {
     default:
-      sql = `SELECT ${fields} FROM ${table}`;
+      sql = `SELECT ${resolvedFields} FROM ${resolvedTable}`;
       if (id) sql += ` WHERE PatientID=:ID`;
   }
   return { sql: sql, data: { ID: id } };
@@ -26,7 +41,7 @@ const buildPatientsReadQuery = (id, variant) => {
 // Data accessors -------------------------------------
 const read = async (id, varaint) => {
   try {
-    const { sql, data } = buildPatientsReadQuery(id, varaint);
+    const { sql, data } = buildReadQuery(id, varaint);
     const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }

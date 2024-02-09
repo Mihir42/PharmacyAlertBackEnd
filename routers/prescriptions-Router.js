@@ -4,6 +4,19 @@ import database from "../database.js";
 const router = Router();
 // Query builders -------------------------------------
 
+const table = "prescriptions";
+const mutableFields = [
+  "PrescriptionsStartDate",
+  "PrescriptionsEndDate",
+  "PrescriptionsDrugID",
+  "Prescriptions_Dose",
+  "Prescriptions_Frequency",
+  "Prescriptions_Additional_Information",
+  "Prescriptions_Patient_ID",
+];
+const idField = "Prescriptions_ID";
+const fields = [idField, ...mutableFields];
+
 const buildSetPrescriptionsField = (fields) =>
   fields.reduce(
     (setSQL, field, index) =>
@@ -11,11 +24,19 @@ const buildSetPrescriptionsField = (fields) =>
     "SET "
   );
 
-const buildPrescriptionsReadQuery = (id, variant) => {
+const buildCreateQuery = (record) => {
+  const sql =
+    `INSERT INTO ${table} ` + buildSetPrescriptionsField(mutableFields);
+  return { sql, data: record };
+};
+
+const buildReadQuery = (id, variant) => {
   let sql = "";
-  let table =
+  const resolvedTable =
     " ((prescriptions INNER JOIN drugs ON drugs.Drugs_ID = prescriptions.PrescriptionsDrugID) INNER JOIN patients on patients.PatientID = prescriptions.Prescriptions_Patient_ID)";
-  let fields = [
+  const resolvedFields = [
+    idField,
+    mutableFields,
     "prescriptions.Prescriptions_ID",
     "drugs.Drugs_ID",
     "drugs.Drugs_Name",
@@ -30,61 +51,33 @@ const buildPrescriptionsReadQuery = (id, variant) => {
 
   switch (variant) {
     case "patients":
-      sql = `SELECT ${fields} FROM ${table} WHERE PatientID=:ID`;
+      sql = `SELECT ${resolvedFields} FROM ${resolvedTable} WHERE PatientID=:ID`;
       break;
     default:
-      sql = `SELECT ${fields} FROM ${table}`;
+      sql = `SELECT ${resolvedFields} FROM ${resolvedTable}`;
       if (id) sql += `WHERE Prescriptions_ID=:ID`;
   }
 
   return { sql: sql, data: { ID: id } };
 };
 
-const buildPrescriptionsCreateQuery = (record) => {
-  let table = "prescriptions";
-  let mutableFields = [
-    "PrescriptionsStartDate",
-    "PrescriptionsEndDate",
-    "PrescriptionsDrugID",
-    "Prescriptions_Dose",
-    "Prescriptions_Frequency",
-    "Prescriptions_Additional_Information",
-    "Prescriptions_Patient_ID",
-  ];
-  const sql =
-    `INSERT INTO ${table} ` + buildSetPrescriptionsField(mutableFields);
-  return { sql, data: record };
-};
-
-const buildPrescriptionsUpdateQuery = (record, id) => {
-  let table = "prescriptions";
-  let mutableFields = [
-    "PrescriptionsStartDate",
-    "PrescriptionsEndDate",
-    "PrescriptionsDrugID",
-    "Prescriptions_Dose",
-    "Prescriptions_Frequency",
-    "Prescriptions_Additional_Information",
-    "Prescriptions_Patient_ID",
-  ];
-
+const buildUpdateQuery = (record, id) => {
   const sql =
     `UPDATE ${table} ` +
     buildSetPrescriptionsField(mutableFields) +
-    ` WHERE Prescriptions_ID=:Prescriptions_ID`;
-  return { sql, data: { ...record, Prescriptions_ID: id } };
+    ` WHERE ${idField}=:${idField}`;
+  return { sql, data: { ...record, [idField]: id } };
 };
 
-const buildPrescriptionsDeleteQuery = (id) => {
-  let table = "prescriptions";
-  const sql = `DELETE FROM ${table} WHERE Prescriptions_ID=:Prescriptions_ID`;
-  return { sql, data: { Prescriptions_ID: id } };
+const buildDeleteQuery = (id) => {
+  const sql = `DELETE FROM ${table} WHERE ${idField}=:${idField}`;
+  return { sql, data: { [idField]: id } };
 };
 
 // Data accessors -------------------------------------
 const create = async (record) => {
   try {
-    const { sql, data } = buildPrescriptionsCreateQuery(record);
+    const { sql, data } = buildCreateQuery(record);
     const status = await database.query(sql, data);
     const { isSuccess, result, message } = await read(status[0].insertId, null);
 
@@ -110,7 +103,7 @@ const create = async (record) => {
 
 const read = async (id, variant) => {
   try {
-    const { sql, data } = buildPrescriptionsReadQuery(id, variant);
+    const { sql, data } = buildReadQuery(id, variant);
     const [result] = await database.query(sql, data);
     return result.length === 0
       ? { isSuccess: false, result: null, message: "No record(s) found" }
@@ -130,7 +123,7 @@ const read = async (id, variant) => {
 
 const update = async (record, id) => {
   try {
-    const { sql, data } = buildPrescriptionsUpdateQuery(record, id);
+    const { sql, data } = buildUpdateQuery(record, id);
     const status = await database.query(sql, data);
 
     if (status[0].affectedRows === 0)
@@ -164,7 +157,7 @@ const update = async (record, id) => {
 
 const _delete = async (id) => {
   try {
-    const { sql, data } = buildPrescriptionsDeleteQuery(id);
+    const { sql, data } = buildDeleteQuery(id);
     const status = await database.query(sql, data);
     return status[0].affectedRows === 0
       ? {

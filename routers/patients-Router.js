@@ -2,6 +2,8 @@ import { Router } from "express";
 import Model from "../models/Model.js";
 import modelConfig from "../models/patients-model.js";
 import database from "../database.js";
+import Accessor from "../accessor/Accessor.js";
+import Controller from "../controller/Controller.js";
 
 // Model -------------------------------------
 
@@ -9,43 +11,16 @@ const model = new Model(modelConfig);
 
 // Data accessors -------------------------------------
 
-const read = async (id, variant) => {
-  try {
-    const { sql, data } = model.buildReadQuery(id, variant);
-    const [result] = await database.query(sql, data);
-    return result.length === 0
-      ? { isSuccess: false, result: null, message: "No record(s) found" }
-      : {
-          isSuccess: true,
-          result: result,
-          message: "Record(s) successfully recovered",
-        };
-  } catch (error) {
-    return {
-      isSuccess: false,
-      result: null,
-      message: `Failed to execute query: ${error.message}`,
-    };
-  }
-};
+const accessor = new Accessor(model, database);
 
 // Controllers -------------------------------------
-const getPatientsController = async (req, res, varaint) => {
-  const id = req.params.id;
 
-  // validate request
-  // Access data
-  const { isSuccess, result, message } = await read(id, varaint);
-  if (!isSuccess) return res.status(404).json({ message });
-
-  // Reponse to request
-  res.status(200).json(result);
-};
+const controller = new Controller(accessor);
 
 // Endpoints -------------------------------------
 
 const router = Router();
-router.get("/", (req, res) => getPatientsController(req, res, null));
-router.get("/:id", (req, res) => getPatientsController(req, res, null));
+router.get("/", (req, res) => controller.get(req, res, null));
+router.get("/:id", (req, res) => controller.get(req, res, null));
 
 export default router;

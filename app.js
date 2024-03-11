@@ -6,6 +6,7 @@ import drugRouter from "./routers/drugs-Router.js";
 import prescriptionRouter from "./routers/prescriptions-Router.js";
 import patientsRouter from "./routers/patients-Router.js";
 import pharmacistRouter from "./routers/pharmacist-Router.js";
+import gpRouter from "./routers/gp-Router.js";
 
 // Configure express app -------------------------
 
@@ -45,6 +46,7 @@ app.use("/api/prescriptions", prescriptionRouter);
 app.use("/api/prescriptions/patients", prescriptionRouter);
 app.use("/api/patients", patientsRouter);
 app.use("/api/pharmacists", pharmacistRouter);
+app.use("/api/gps", gpRouter);
 
 // Prescriptions
 

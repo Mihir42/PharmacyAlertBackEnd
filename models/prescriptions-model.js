@@ -29,6 +29,8 @@ model.buildReadQuery = (id, variant) => {
     "prescriptions.PrescriptionsStartDate",
     "prescriptions.PrescriptionsEndDate",
     "patients.PatientID",
+    "patients.PatientFirstName",
+    "patients.PatientLastName",
   ];
 
   switch (variant) {
